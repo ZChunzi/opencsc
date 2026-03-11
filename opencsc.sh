@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# OpenClaw 安全检测与配置管理脚本（优化版）
+# OpenClaw 安全检测与配置管理脚本（增强自动扫描版）
 # 功能：
 # 1. 检测绑定 IP 是否为公开地址
 # 2. 检测端口是否为默认端口（18789）
@@ -8,8 +8,10 @@
 # 4. 分析安全风险程度
 # 5. 查看当前配置
 # 6. 修改配置（端口/绑定模式）
+#
+# 特性：支持自动扫描配置文件位置
 
-set -euo pipefail  # 启用严格模式
+set -euo pipefail
 
 # 颜色定义
 RED='\033[0;31m'
@@ -22,7 +24,7 @@ NC='\033[0m'
 # 默认配置
 OPENCLAW_DEFAULT_PORT="18789"
 DEFAULT_PORTS=("80" "443" "8080" "8443" "22" "21" "23" "3389" "3306" "5432" "6379" "27017")
-# 常见配置文件路径
+# 常见配置文件路径（优先检查）
 DEFAULT_CONFIG_PATHS=(
     "/etc/openclaw/config.json"
     "/usr/local/openclaw/config.json"
@@ -38,12 +40,13 @@ CONFIG_FILE="${OPENCLAW_CONFIG:-}"
 # 显示使用方法
 usage() {
     cat <<EOF
-${BLUE}OpenClaw 安全检测与配置管理（优化版）${NC}
+${BLUE}OpenClaw 安全检测与配置管理（增强自动扫描版）${NC}
 
 使用方法: $0 [选项] [子命令]
 
 选项:
-  -c, --config <文件>   指定配置文件路径（默认自动查找）
+  -c, --config <文件>   指定配置文件路径（跳过自动扫描）
+  -s, --scan            强制扫描配置文件（即使有预设路径也扫描）
   -h, --help            显示帮助信息
 
 子命令:
@@ -54,25 +57,70 @@ ${BLUE}OpenClaw 安全检测与配置管理（优化版）${NC}
   help        显示帮助信息
 
 示例:
-  $0 check                         # 运行安全检测
+  $0 check                         # 自动查找/扫描配置文件并检测
   $0 -c /path/to/config.json view  # 查看指定配置
   $0 set-port 20000                 # 修改端口为 20000
   $0 set-bind lan                    # 修改绑定为局域网
 EOF
 }
 
-# 查找配置文件
+# 查找配置文件（增强版：预设路径 + 自动扫描）
 find_config() {
+    # 如果已通过环境变量或-c指定，直接使用
     if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
         echo "$CONFIG_FILE"
         return 0
     fi
+
+    # 检查预设路径
     for path in "${DEFAULT_CONFIG_PATHS[@]}"; do
         if [[ -f "$path" ]]; then
             echo "$path"
             return 0
         fi
     done
+
+    # 预设路径未找到，询问是否自动扫描
+    echo -e "${YELLOW}未在常见位置找到配置文件。是否自动扫描系统目录（可能耗时）？ [y/N]${NC} " >&2
+    read -r -n 1 scan_confirm
+    echo >&2
+    if [[ ! "$scan_confirm" =~ ^[Yy]$ ]]; then
+        return 1
+    fi
+
+    # 开始自动扫描
+    echo -e "${CYAN}正在扫描可能的位置，请稍候...${NC}" >&2
+    # 定义搜索目录（可根据需要调整）
+    SEARCH_DIRS=("/home" "/etc" "/opt" "/usr/local" "/var" "/root")
+    local found=""
+    for dir in "${SEARCH_DIRS[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            continue
+        fi
+        # 使用 find 搜索，限制深度为 5 避免过深，且只查找普通文件
+        # 2>/dev/null 忽略权限错误
+        found=$(find "$dir" -maxdepth 5 -type f -name "openclaw.json" 2>/dev/null | head -1)
+        if [[ -n "$found" ]]; then
+            echo -e "${GREEN}找到配置文件: $found${NC}" >&2
+            echo "$found"
+            return 0
+        fi
+    done
+
+    # 如果上面没找到，尝试全系统扫描（需要权限），询问用户
+    echo -e "${YELLOW}在常用目录未找到，是否进行全面系统扫描（需要 root 权限，可能非常耗时）？ [y/N]${NC} " >&2
+    read -r -n 1 full_scan
+    echo >&2
+    if [[ "$full_scan" =~ ^[Yy]$ ]]; then
+        echo -e "${CYAN}正在进行全系统扫描（这可能需要几分钟）...${NC}" >&2
+        found=$(sudo find / -type f -name "openclaw.json" 2>/dev/null | head -1)
+        if [[ -n "$found" ]]; then
+            echo -e "${GREEN}找到配置文件: $found${NC}" >&2
+            echo "$found"
+            return 0
+        fi
+    fi
+
     return 1
 }
 
@@ -92,6 +140,7 @@ get_json_value() {
 load_config() {
     if [[ ! -f "$CONFIG_FILE" ]]; then
         echo -e "${RED}错误: 配置文件不存在: $CONFIG_FILE${NC}" >&2
+        echo -e "${YELLOW}请使用 -c 参数指定配置文件路径，或让脚本自动扫描。${NC}" >&2
         exit 1
     fi
     GATEWAY_PORT=$(get_json_value '.port' "$CONFIG_FILE")
@@ -264,7 +313,7 @@ check_firewall() {
 # 检测端口监听状态
 check_listening() {
     local port=$1
-    local expected_bind=$2  # 用于粗略判断
+    local expected_bind=$2
     local listening=false
     local addr=""
 
@@ -325,26 +374,21 @@ risk_analysis() {
 
     # 防火墙状态
     if $fw_open; then
-        :  # 放行本身不是风险，但若与暴露绑定叠加则加重
         if [[ "$bind" != "loopback" ]]; then
             score=$((score + 10)); factors+=("防火墙放行且非本地绑定")
         fi
     else
-        # 如果防火墙未放行，可降低风险
         score=$((score - 10))
     fi
 
-    # 未监听则无风险（但可能是配置错误）
     if ! $listening; then
         echo -e "${YELLOW}警告: 端口未监听，请检查服务状态${NC}"
         suggestions+=("检查 OpenClaw 服务是否运行")
         score=0
     fi
 
-    # 确保分数在 0-100 之间
     (( score = score < 0 ? 0 : (score > 100 ? 100 : score) ))
 
-    # 输出
     echo -e "${YELLOW}[4] 风险因素${NC}"
     if [[ ${#factors[@]} -gt 0 ]]; then
         for f in "${factors[@]}"; do echo "  • ${YELLOW}$f${NC}"; done
@@ -366,7 +410,6 @@ risk_analysis() {
     if [[ ${#suggestions[@]} -gt 0 ]]; then
         for s in "${suggestions[@]}"; do echo "  • ${RED}$s${NC}"; done
     fi
-    # 通用建议
     cat <<EOF
   • 启用防火墙，仅放行必要端口
   • 定期更新 OpenClaw 版本
@@ -378,7 +421,7 @@ EOF
 # 安全检测主函数
 security_check() {
     echo -e "${BLUE}======================================${NC}"
-    echo -e "${BLUE}   OpenClaw 安全检测脚本（优化版）${NC}"
+    echo -e "${BLUE}   OpenClaw 安全检测脚本（增强自动扫描版）${NC}"
     echo -e "${BLUE}======================================${NC}\n"
 
     load_config
@@ -425,7 +468,6 @@ security_check() {
     fi
     echo ""
 
-    # [4-5] 风险分析与建议
     risk_analysis "$GATEWAY_BIND" "$GATEWAY_PORT" "$GATEWAY_MODE" "$GATEWAY_TOKEN" "$fw_open" "$listening"
 
     echo ""
@@ -436,12 +478,18 @@ security_check() {
 
 # 主函数
 main() {
+    local force_scan=false
+
     # 解析全局选项
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -c|--config)
                 CONFIG_FILE="$2"
                 shift 2
+                ;;
+            -s|--scan)
+                force_scan=true
+                shift
                 ;;
             -h|--help)
                 usage
@@ -453,13 +501,21 @@ main() {
         esac
     done
 
-    # 如果未指定配置文件，则自动查找
+    # 如果强制扫描，则忽略预设路径和环境变量
+    if $force_scan && [[ -z "$CONFIG_FILE" ]]; then
+        CONFIG_FILE=""
+    fi
+
+    # 查找配置文件
     if [[ -z "$CONFIG_FILE" ]]; then
         CONFIG_FILE=$(find_config) || {
-            echo -e "${RED}错误: 未找到配置文件，请使用 -c 指定或设置 OPENCLAW_CONFIG 环境变量${NC}" >&2
+            echo -e "${RED}错误: 无法自动找到配置文件。请使用 -c 手动指定。${NC}" >&2
             exit 1
         }
         echo -e "${CYAN}使用配置文件: $CONFIG_FILE${NC}"
+    elif [[ ! -f "$CONFIG_FILE" ]]; then
+        echo -e "${RED}错误: 指定的配置文件不存在: $CONFIG_FILE${NC}" >&2
+        exit 1
     fi
 
     # 处理子命令
@@ -490,5 +546,4 @@ main() {
     esac
 }
 
-# 执行主函数
 main "$@"
