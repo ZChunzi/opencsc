@@ -32,12 +32,23 @@ OPENCLAW_DEFAULT_PORT="18789"
 DEFAULT_PORTS=("80" "443" "8080" "8443" "22" "21" "23" "3389" "3306" "5432" "6379" "27017")
 # 常见配置文件路径（优先检查，这些路径通常可信）
 DEFAULT_CONFIG_PATHS=(
+    # 系统级配置（最优先）
     "/etc/openclaw/config.json"
     "/etc/openclaw.json"
     "/usr/local/openclaw/config.json"
     "/usr/local/openclaw.json"
     "/opt/openclaw/config.json"
     "/opt/openclaw.json"
+    # Docker 容器路径
+    "/docker-mount/openclaw/config.json"
+    # 用户级配置（较低优先级）
+    "$HOME/.config/openclaw/config.json"
+    "$HOME/.openclaw/config.json"
+    "$HOME/openclaw/config.json"
+    # 当前目录及父目录
+    "./openclaw.json"
+    "../openclaw.json"
+    "./config.json"
 )
 # 环境变量可覆盖
 CONFIG_FILE="${OPENCLAW_CONFIG:-}"
@@ -71,16 +82,54 @@ EOF
 # 检查文件是否为有效的 OpenClaw 配置文件
 is_valid_config() {
     local file=$1
-    # 简单检查：是否包含 "port" 和 "bind" 字段
-    if grep -q '"port"' "$file" 2>/dev/null && grep -q '"bind"' "$file" 2>/dev/null; then
-        return 0
-    else
+    
+    # 检查文件是否存在且可读
+    if [[ ! -f "$file" || ! -r "$file" ]]; then
         return 1
     fi
+
+    # 检查是否为 JSON 格式
+    if ! grep -q '^[[:space:]]*{' "$file" 2>/dev/null; then
+        return 1
+    fi
+
+    # 必要字段检查
+    local required_fields=("port" "bind")
+    for field in "${required_fields[@]}"; do
+        if ! grep -q "\"$field\"" "$file" 2>/dev/null; then
+            return 1
+        fi
+    done
+
+    # 使用 jq 进行深层验证（如果可用）
+    if command -v jq &>/dev/null; then
+        local port
+        port=$(jq -r '.port // empty' "$file" 2>/dev/null)
+        
+        # 验证端口是否为有效数字
+        if [[ -z "$port" ]] || ! [[ "$port" =~ ^[0-9]+$ ]]; then
+            return 1
+        fi
+        
+        # 验证端口范围
+        if (( port < 1 || port > 65535 )); then
+            return 1
+        fi
+        
+        # 验证 bind 字段存在
+        if ! jq -e '.bind' "$file" &>/dev/null; then
+            return 1
+        fi
+    fi
+
+    return 0
 }
 
 # 查找配置文件（精确扫描版）
 find_config() {
+    local found_configs=()
+    local best_config=""
+    
     # 如果已通过环境变量或-c指定，直接使用
     if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
         if is_valid_config "$CONFIG_FILE"; then
@@ -92,34 +141,103 @@ find_config() {
         fi
     fi
 
-    # 检查预设路径（这些路径通常可信）
+    # 优先检查预设路径（这些路径通常可信）
+    echo -e "${CYAN}正在检查预设配置路径...${NC}" >&2
     for path in "${DEFAULT_CONFIG_PATHS[@]}"; do
         if [[ -f "$path" ]] && is_valid_config "$path"; then
+            echo -e "${GREEN}✓ 找到有效配置: $path${NC}" >&2
             echo "$path"
             return 0
         fi
     done
 
-    # 自动扫描系统程序目录
-    echo -e "${CYAN}未在常见位置找到有效配置文件，正在自动扫描系统目录，请稍候...${NC}" >&2
-    # 只扫描系统程序目录，避免用户缓存
-    SEARCH_DIRS=("/etc" "/opt" "/usr/local")
-    for dir in "${SEARCH_DIRS[@]}"; do
-        if [[ ! -d "$dir" ]]; then
-            continue
+    # 如果预设路径未找到，进行系统扫描
+    echo -e "${CYAN}预设路径未找到有效配置，开始自动系统扫描...${NC}" >&2
+    
+    # 扩展搜索目录（按优先级）
+    local search_dirs=(
+        "/etc/openclaw"
+        "/opt/openclaw"
+        "/usr/local/openclaw"
+        "/srv/openclaw"
+        "/app/openclaw"
+    )
+
+    # 1. 扫描标准系统目录
+    for dir in "${search_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            while IFS= read -r file; do
+                if is_valid_config "$file"; then
+                    found_configs+=("$file")
+                    echo -e "${GREEN}✓ 扫描发现有效配置: $file${NC}" >&2
+                fi
+            done < <(find "$dir" -maxdepth 3 -type f \( -name "config.json" -o -name "openclaw.json" \) 2>/dev/null)
         fi
-        # 使用 find 搜索，限制深度为 5，避免过深遍历
-        while IFS= read -r file; do
-            if is_valid_config "$file"; then
-                echo -e "${GREEN}找到有效配置文件: $file${NC}" >&2
-                echo "$file"
-                return 0
-            fi
-        done < <(find "$dir" -maxdepth 5 -type f -name "openclaw.json" 2>/dev/null)
     done
 
-    echo -e "${YELLOW}未找到有效的 openclaw.json 配置文件。${NC}" >&2
-    echo -e "${YELLOW}请使用 -c 参数手动指定配置文件路径，或设置 OPENCLAW_CONFIG 环境变量。${NC}" >&2
+    # 如果找到配置，使用第一个（最佳匹配）
+    if [[ ${#found_configs[@]} -gt 0 ]]; then
+        best_config="${found_configs[0]}"
+        echo "$best_config"
+        return 0
+    fi
+
+    # 2. 深度扫描用户配置目录（如果没找到）
+    echo -e "${CYAN}继续深度扫描用户目录...${NC}" >&2
+    if [[ -d "$HOME" ]]; then
+        while IFS= read -r file; do
+            if is_valid_config "$file"; then
+                found_configs+=("$file")
+                echo -e "${YELLOW}✓ 用户目录发现配置: $file${NC}" >&2
+            fi
+        done < <(find "$HOME" -maxdepth 4 -type f \( -name "*openclaw*.json" -o -name "config.json" \) 2>/dev/null | head -10)
+    fi
+
+    if [[ ${#found_configs[@]} -gt 0 ]]; then
+        best_config="${found_configs[0]}"
+        echo "$best_config"
+        return 0
+    fi
+
+    # 3. 最后尝试查找所有 JSON 文件中可能的 openclaw 配置
+    echo -e "${CYAN}执行全局扫描，寻找可能的 OpenClaw 配置文件...${NC}" >&2
+    for base_dir in /etc /opt /usr /srv /app /home; do
+        if [[ ! -d "$base_dir" ]]; then
+            continue
+        fi
+        while IFS= read -r file; do
+            if is_valid_config "$file"; then
+                found_configs+=("$file")
+                echo -e "${YELLOW}✓ 全局搜索发现配置: $file${NC}" >&2
+                if [[ ${#found_configs[@]} -ge 3 ]]; then
+                    break 2  # 找到足够候选项后停止
+                fi
+            fi
+        done < <(find "$base_dir" -maxdepth 5 -type f -name "*openclaw*.json" -o -name "*.json" -path "*openclaw*" 2>/dev/null | head -5)
+    done
+
+    if [[ ${#found_configs[@]} -gt 0 ]]; then
+        # 优先选择系统级配置
+        for config in "${found_configs[@]}"; do
+            if [[ "$config" =~ ^/etc|^/opt|^/usr/local ]]; then
+                best_config="$config"
+                break
+            fi
+        done
+        # 如果没有系统级配置，使用第一个找到的
+        if [[ -z "$best_config" ]]; then
+            best_config="${found_configs[0]}"
+        fi
+        echo "$best_config"
+        return 0
+    fi
+
+    # 未找到有效配置
+    echo -e "${RED}✗ 未找到有效的 OpenClaw 配置文件${NC}" >&2
+    echo -e "${YELLOW}请尝试以下方法:${NC}" >&2
+    echo -e "  1. 使用 ${CYAN}-c${NC} 参数手动指定: ${CYAN}$0 -c /path/to/config.json${NC}" >&2
+    echo -e "  2. 设置环境变量: ${CYAN}export OPENCLAW_CONFIG=/path/to/config.json${NC}" >&2
+    echo -e "  3. 检查 OpenClaw 是否已安装到标准位置" >&2
     return 1
 }
 
