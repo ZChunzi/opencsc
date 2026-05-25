@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="format-detection" content="telephone=no,email=no,address=no" />
+  <title>POW! 打靶王</title>
+  <style>
+    :root {
+      --app-h: 100vh;
+      --kb-offset: 0px;
+      --safe-bottom: env(safe-area-inset-bottom);
+      --ink: #101010;
+      --yellow: #ffd60a;
+      --orange: #fb8500;
+      --pink: #ff006e;
+      --cyan: #4cc9f0;
+      --mint: #80ffdb;
+      --bg-a: #2f1d68;
+      --bg-b: #121a43;
+      --bg-c: #17111f;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background-color: #121a43 !important;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(255, 230, 109, .38), transparent 18%),
+        radial-gradient(circle at 88% 10%, rgba(255, 0, 110, .24), transparent 22%),
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .18), transparent 20%),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    body {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: var(--app-h);
+      touch-action: manipulation;
+    }
+
+    button,
+    input {
+      font: inherit;
+      border: 0;
+      outline: none;
+    }
+
+    .viewport-bg-fix {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: -180px;
+      z-index: 0;
+      pointer-events: none;
+      background-color: #121a43;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(255, 230, 109, .38), transparent 18%),
+        radial-gradient(circle at 88% 10%, rgba(255, 0, 110, .24), transparent 22%),
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .18), transparent 20%),
+        radial-gradient(circle at 90% 84%, rgba(76, 201, 240, .18), transparent 24%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 3px, transparent 3px 20px),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+    }
+
+    .app {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: var(--app-h);
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: hidden;
+      z-index: 1;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(255, 230, 109, .38), transparent 18%),
+        radial-gradient(circle at 88% 10%, rgba(255, 0, 110, .24), transparent 22%),
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .18), transparent 20%),
+        radial-gradient(circle at 90% 84%, rgba(76, 201, 240, .18), transparent 24%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 3px, transparent 3px 20px),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+    }
+
+    .app::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 80px;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .16), transparent 22%),
+        radial-gradient(circle at 90% 90%, rgba(76, 201, 240, .14), transparent 24%),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+    }
+
+    .game-screen,
+    .chat-screen {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .game-screen {
+      display: flex;
+      padding: max(12px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
+      background:
+        radial-gradient(circle at 10% 8%, rgba(255, 230, 109, .38), transparent 18%),
+        radial-gradient(circle at 88% 10%, rgba(255, 0, 110, .24), transparent 22%),
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .18), transparent 20%),
+        radial-gradient(circle at 90% 84%, rgba(76, 201, 240, .18), transparent 24%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0 3px, transparent 3px 20px),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+    }
+
+    .chat-screen {
+      display: none;
+      background:
+        radial-gradient(circle at 8% 10%, rgba(255, 214, 10, .32), transparent 16%),
+        radial-gradient(circle at 90% 15%, rgba(255, 0, 110, .22), transparent 20%),
+        radial-gradient(circle at 16% 78%, rgba(128, 255, 219, .18), transparent 20%),
+        repeating-linear-gradient(-30deg, rgba(255, 255, 255, .055) 0 3px, transparent 3px 18px),
+        radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px),
+        linear-gradient(180deg, #242a5a 0%, #111728 100%);
+      background-size: auto, auto, auto, auto, 11px 11px, auto;
+    }
+
+    body.chat-mode .game-screen { display: none; }
+    body.chat-mode .chat-screen { display: block; }
+
+    body::before {
+      content: "";
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 160px;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 88%, rgba(128, 255, 219, .18), transparent 20%),
+        radial-gradient(circle at 90% 84%, rgba(76, 201, 240, .18), transparent 24%),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 46%, var(--bg-c) 100%);
+    }
+
+    .game-shell {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .game-head {
+      flex: 0 0 auto;
+      min-height: 116px;
+      padding: 14px;
+      border: 5px solid var(--ink);
+      border-radius: 24px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,.45), transparent 16%),
+        repeating-linear-gradient(-28deg, rgba(16,16,16,.08) 0 2px, transparent 2px 16px),
+        linear-gradient(135deg, #fff275, #ffb703 58%, #ff7b00);
+      box-shadow: 7px 7px 0 var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .game-title strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .5px;
+      text-shadow: 2px 2px 0 rgba(255,255,255,.55);
+    }
+
+    .game-title span {
+      display: block;
+      margin-top: 10px;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 900;
+      color: rgba(0,0,0,.65);
+    }
+
+    .score-card {
+      min-width: 88px;
+      padding: 10px 12px;
+      border: 4px solid var(--ink);
+      border-radius: 20px;
+      background: #fff;
+      text-align: center;
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    .score-card em {
+      display: block;
+      font-style: normal;
+      font-size: 30px;
+      line-height: 1;
+      color: var(--pink);
+      font-weight: 1000;
+    }
+
+    .score-card small { font-weight: 1000; color: var(--ink); }
+
+    .game-info-row {
+      flex: 0 0 50px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .game-info-row div {
+      border: 4px solid var(--ink);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 4px 4px 0 var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      color: var(--ink);
+      font-weight: 1000;
+      font-size: 18px;
+    }
+
+    .game-info-row b { color: #3a0ca3; font-size: 22px; }
+
+    .game-board {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      border: 5px solid var(--ink);
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.20), transparent 20%),
+        radial-gradient(circle at 16% 18%, rgba(255,214,10,.22), transparent 18%),
+        radial-gradient(circle at 84% 18%, rgba(255,0,110,.16), transparent 20%),
+        repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.12) 0 3px, transparent 3px 22px),
+        radial-gradient(rgba(255,255,255,.20) 1px, transparent 1px),
+        linear-gradient(135deg, #4cc9f0 0%, #4361ee 48%, #3a0ca3 100%);
+      background-size: auto, auto, auto, auto, 12px 12px, auto;
+      box-shadow: 8px 8px 0 var(--ink), inset 0 5px 0 rgba(255,255,255,.22);
+      touch-action: manipulation;
+    }
+
+    .game-board::before {
+      content: "";
+      position: absolute;
+      inset: -42%;
+      background: conic-gradient(from 0deg, rgba(255,255,255,.24), transparent 10deg, transparent 22deg, rgba(255,255,255,.14) 28deg, transparent 40deg);
+      animation: comicSpin 20s linear infinite;
+      opacity: .38;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes comicSpin { to { transform: rotate(360deg); } }
+
+    .combo-badge {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      min-width: 82px;
+      padding: 8px 10px;
+      border: 4px solid var(--ink);
+      border-radius: 18px;
+      background: var(--mint);
+      color: var(--ink);
+      box-shadow: 5px 5px 0 var(--ink);
+      z-index: 5;
+      text-align: center;
+      font-weight: 1000;
+      transform: rotate(3deg);
+    }
+
+    .combo-badge span { display: block; font-size: 12px; opacity: .72; }
+    .combo-badge b { display: block; font-size: 26px; line-height: 1; }
+
+    .danmaku-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 8; }
+
+    .danmaku-item {
+      position: absolute;
+      left: 100%;
+      top: var(--track);
+      max-width: 76%;
+      padding: 7px 12px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      white-space: nowrap;
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 4px 4px 0 var(--ink);
+      font-size: 14px;
+      font-weight: 900;
+      animation: danmakuMove var(--speed) linear forwards;
+    }
+
+    .danmaku-item.me { background: var(--mint); }
+    .danmaku-item.other { background: var(--yellow); }
+    @keyframes danmakuMove { to { transform: translateX(calc(-100vw - 120%)); } }
+
+    .target {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      width: var(--s);
+      height: var(--s);
+      border: 4px solid var(--ink);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, #fff 0 16%, var(--ink) 17% 22%, var(--pink) 23% 43%, var(--ink) 44% 50%, var(--yellow) 51% 74%, var(--ink) 75% 81%, #3a86ff 82% 100%);
+      box-shadow: 6px 7px 0 var(--ink), inset 0 5px 8px rgba(255,255,255,.45);
+      z-index: 3;
+      animation: targetIn .16s ease-out, targetPulse .75s ease-in-out infinite alternate;
+      touch-action: manipulation;
+    }
+
+    .target.bonus {
+      background: radial-gradient(circle, #fff 0 15%, var(--ink) 16% 21%, var(--mint) 22% 42%, var(--ink) 43% 49%, var(--pink) 50% 72%, var(--ink) 73% 80%, var(--yellow) 81% 100%);
+    }
+
+    .target.bad {
+      background: radial-gradient(circle, var(--ink) 0 16%, #fff 17% 23%, #adb5bd 24% 52%, var(--ink) 53% 60%, #495057 61% 100%);
+    }
+
+    .target.hit { animation: targetHit .16s ease-out forwards; }
+    @keyframes targetIn { from { transform: scale(.35) rotate(-18deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+    @keyframes targetPulse { from { transform: scale(.96); } to { transform: scale(1.04); } }
+    @keyframes targetHit { to { transform: scale(1.45) rotate(18deg); opacity: 0; } }
+
+    .comic-fx,
+    .score-pop {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+      pointer-events: none;
+      z-index: 20;
+      font-weight: 1000;
+    }
+
+    .comic-fx {
+      padding: 7px 12px;
+      border: 4px solid var(--ink);
+      border-radius: 16px 16px 16px 4px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-size: 20px;
+      box-shadow: 5px 5px 0 var(--ink);
+      animation: fxPop .62s ease-out forwards;
+    }
+
+    .comic-fx.hot { background: var(--pink); color: #fff; }
+    .score-pop { color: #fff; font-size: 18px; text-shadow: 3px 3px 0 var(--ink), -1px -1px 0 var(--ink); animation: scorePop .58s ease-out forwards; }
+    @keyframes fxPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(var(--r, 0deg)); } 28% { opacity: 1; transform: translate(-50%, -64%) scale(1.08) rotate(var(--r, 0deg)); } 100% { opacity: 0; transform: translate(-50%, -108%) scale(.9) rotate(var(--r, 0deg)); } }
+    @keyframes scorePop { 0% { opacity: 0; transform: translate(-50%, -35%) scale(.6); } 25% { opacity: 1; transform: translate(-50%, -70%) scale(1.14); } 100% { opacity: 0; transform: translate(-50%, -130%) scale(.9); } }
+
+    .game-chat-bar {
+      flex: 0 0 58px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 7px;
+      border: 5px solid var(--ink);
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 5px 5px 0 var(--ink);
+    }
+
+    .game-chat-bar input,
+    .composer input { -webkit-user-select: text; user-select: text; }
+
+    .game-chat-bar input {
+      flex: 1;
+      min-width: 0;
+      height: 36px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      padding: 0 12px;
+      color: var(--ink);
+      background: #fff;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .game-chat-bar button {
+      flex: 0 0 58px;
+      height: 36px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-weight: 1000;
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .game-bottom { flex: 0 0 66px; display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 10px; }
+    .game-btn, .game-chat-btn { border: 5px solid var(--ink); border-radius: 24px; color: var(--ink); background: #fff; box-shadow: 5px 5px 0 var(--ink); font-size: 18px; font-weight: 1000; }
+    .game-chat-btn { background: linear-gradient(135deg, var(--orange), var(--pink)); }
+    .game-btn:active, .game-chat-btn:active, .game-chat-bar button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+
+    .chat-top {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 70px;
+      padding: 10px 14px;
+      border-bottom: 5px solid var(--ink);
+      border-radius: 0 0 20px 20px;
+      background:
+        repeating-linear-gradient(-28deg, rgba(16,16,16,.08) 0 2px, transparent 2px 16px),
+        linear-gradient(135deg, #ffe066 0%, #ff9f1c 54%, #ff006e 115%);
+      box-shadow: 0 6px 0 var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--ink);
+      z-index: 10;
+    }
+
+    .chat-title strong { display: block; font-size: 22px; line-height: 1; font-weight: 1000; text-shadow: 2px 2px 0 rgba(255,255,255,.45); }
+    .chat-title span { display: block; margin-top: 4px; font-size: 11px; font-weight: 900; color: rgba(0,0,0,.72); }
+
+    .back-game-btn, .quick-game-fab { border: 4px solid var(--ink); background: #fff; color: var(--ink); font-weight: 1000; box-shadow: 3px 3px 0 var(--ink); }
+    .back-game-btn { height: 34px; padding: 0 14px; border-radius: 14px; }
+
+    .chat-list { position: absolute; left: 0; right: 0; top: 72px; bottom: 160px; padding: 18px 14px 24px; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .chat-list::before { content: "POW!  BAM!  WOW!"; position: fixed; left: -22px; top: 94px; width: 130vw; color: rgba(255,255,255,.12); font-size: 54px; font-weight: 1000; letter-spacing: -2px; transform: rotate(-10deg); pointer-events: none; z-index: 0; }
+    .msg-row { position: relative; z-index: 2; display: flex; width: 100%; margin-bottom: 14px; }
+    .msg-row.me { justify-content: flex-end; }
+    .msg-row.other { justify-content: flex-start; }
+
+    .bubble { position: relative; max-width: 78%; min-width: 78px; min-height: 42px; padding: 12px 14px; border: 4px solid var(--ink); border-radius: 20px; background: #fff; color: var(--ink); box-shadow: 5px 5px 0 var(--ink); font-size: 15px; font-weight: 900; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+    .me .bubble { background: var(--mint); }
+    .other .bubble { background: #fff; }
+    .bubble.sticker-bubble { padding: 8px; min-width: 96px; min-height: 96px; }
+    .bubble-media { display: block; width: 112px; max-width: 34vw; height: 112px; object-fit: contain; border-radius: 14px; }
+    .emoji-only { font-size: 30px; line-height: 1.25; }
+    body:not(.revealed) .bubble-text, body:not(.revealed) .bubble-media { opacity: 0; filter: blur(8px); }
+    body:not(.revealed) .bubble::after { content: ""; position: absolute; left: 14px; right: 14px; top: 50%; height: 12px; transform: translateY(-50%); border-radius: 999px; background: var(--ink); opacity: .18; }
+    body:not(.revealed) .sticker-bubble::after { left: 50%; right: auto; width: 48px; height: 48px; border-radius: 14px; transform: translate(-50%, -50%); }
+
+    .tool-panel { position: absolute; left: 10px; right: 10px; bottom: 146px; height: 248px; padding: 12px; border: 4px solid var(--ink); border-radius: 24px; background: radial-gradient(circle at 18% 16%, rgba(255,214,10,.18), transparent 18%), radial-gradient(rgba(0,0,0,.09) 1px, transparent 1px), linear-gradient(135deg, #ffffff, #f8f9fa); background-size: auto, 10px 10px, auto; box-shadow: 6px 6px 0 var(--ink); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(18px) scale(.98); transition: opacity .16s ease, transform .16s ease, visibility .16s ease; z-index: 20; }
+    body.panel-open .tool-panel { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); }
+    .panel-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+    .panel-tab { height: 34px; padding: 0 16px; border: 3px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink); box-shadow: 2px 2px 0 var(--ink); font-weight: 1000; }
+    .panel-tab.active { color: #fff; background: var(--pink); }
+    .panel-page { display: none; height: 188px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .panel-page.active { display: block; }
+    .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+    .emoji-item, .sticker-item, .upload-sticker { border: 3px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 2px 2px 0 var(--ink); }
+    .emoji-item { height: 38px; font-size: 22px; }
+    .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .sticker-item, .upload-sticker { height: 76px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+    .sticker-item img { width: 58px; height: 58px; object-fit: contain; }
+    .upload-sticker { flex-direction: column; color: var(--ink); font-size: 12px; font-weight: 1000; }
+    .upload-sticker b { font-size: 24px; line-height: 1; }
+    .upload-sticker input { position: absolute; inset: 0; opacity: 0; }
+
+    .composer { position: absolute; left: 10px; right: 10px; bottom: 92px; min-height: 58px; padding: 8px; display: flex; gap: 8px; align-items: center; border: 4px solid var(--ink); border-radius: 24px; background: #fff; box-shadow: 5px 5px 0 var(--ink); z-index: 18; }
+    .small-tool { flex: 0 0 40px; width: 40px; height: 40px; border: 3px solid var(--ink); border-radius: 50%; background: var(--yellow); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); font-size: 18px; font-weight: 1000; }
+    .small-tool.active { background: var(--pink); color: #fff; }
+    .composer input { flex: 1; min-width: 0; height: 40px; border: 3px solid var(--ink); border-radius: 999px; padding: 0 14px; color: var(--ink); font-size: 14px; font-weight: 800; background: #fff; }
+    .send-btn { flex: 0 0 60px; height: 40px; border: 3px solid var(--ink); border-radius: 999px; background: linear-gradient(135deg, var(--mint), #06d6a0); color: var(--ink); font-size: 14px; font-weight: 1000; box-shadow: 3px 3px 0 var(--ink); }
+    .hold-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; display: flex; align-items: center; justify-content: center; padding-bottom: max(10px, env(safe-area-inset-bottom)); z-index: 16; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(15,17,25,.68)); }
+    .hold-btn { position: relative; width: 72px; height: 72px; border: 4px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 28% 24%, rgba(255,255,255,.70), transparent 18%), linear-gradient(135deg, var(--pink), #ff5d8f 52%, var(--yellow)); box-shadow: 5px 5px 0 var(--ink); }
+    .hold-btn::before { content: ""; position: absolute; inset: 10px; border: 3px dashed rgba(16,16,16,.55); border-radius: 50%; }
+    .hold-btn::after { content: "HOLD"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--ink); font-size: 12px; font-weight: 1000; }
+    .hold-btn.is-down { transform: translate(3px, 3px) scale(.96); box-shadow: 2px 2px 0 var(--ink); }
+    .hint { position: absolute; bottom: 18px; left: calc(50% + 50px); font-size: 11px; font-weight: 1000; color: rgba(255,255,255,.78); white-space: nowrap; }
+    .quick-game-fab { position: absolute; right: 14px; bottom: 160px; width: 58px; height: 58px; border-radius: 50%; background: linear-gradient(135deg, var(--yellow), var(--orange)); z-index: 21; }
+
+    body.keyboard-open .hold-zone, body.keyboard-open .quick-game-fab, body.keyboard-open .game-bottom { display: none; }
+    body.keyboard-open .composer, body.keyboard-open .game-chat-bar { position: fixed; left: 10px; right: 10px; bottom: calc(var(--kb-offset) + 8px); z-index: 80; transform: translateZ(0); }
+    body.keyboard-open .chat-list { bottom: calc(var(--kb-offset) + 76px); }
+    body.keyboard-open .game-board { margin-bottom: 62px; }
+
+    @media (max-width: 360px) {
+      .game-title strong { font-size: 25px; }
+      .game-title span { font-size: 12px; }
+      .game-head { min-height: 108px; }
+      .emoji-grid { grid-template-columns: repeat(7, 1fr); }
+      .sticker-grid { grid-template-columns: repeat(3, 1fr); }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport-bg-fix" aria-hidden="true"></div>
+  <div class="app" id="app">
+    <section class="game-screen" id="gameScreen">
+      <div class="game-shell">
+        <div class="game-head">
+          <div class="game-title">
+            <strong>POW! 打靶王</strong>
+            <span>点击靶心、保持连击、避开灰色炸弹靶</span>
+          </div>
+          <div class="score-card">
+            <em id="gameScore">0</em>
+            <small>分数</small>
+          </div>
+        </div>
+        <div class="game-info-row">
+          <div>等级 <b id="gameLevel">1</b></div>
+          <div>连击 <b id="gameCombo">0</b></div>
+          <div>时间 <b id="gameTime">45</b>s</div>
+        </div>
+        <div class="game-board" id="gameBoard">
+          <div class="danmaku-layer" id="danmakuLayer"></div>
+          <div class="combo-badge"><span>COMBO</span><b id="gameComboBadge">0</b></div>
+        </div>
+        <div class="game-chat-bar" id="gameChatBar">
+          <input id="gameChatInput" type="text" placeholder="发一条弹幕消息" autocomplete="off" />
+          <button id="gameChatSend" type="button">GO</button>
+        </div>
+        <div class="game-bottom">
+          <button class="game-btn" id="gamePauseBtn" type="button">暂停</button>
+          <button class="game-chat-btn" id="openChatBtn" type="button">会话</button>
+          <button class="game-btn" id="gameResetBtn" type="button">重开</button>
+        </div>
+      </div>
+    </section>
+    <section class="chat-screen" id="chatScreen">
+      <header class="chat-top">
+        <div class="chat-title"><strong>MISSION CHAT</strong><span>HOLD TO REVEAL MESSAGE</span></div>
+        <button id="backGameBtn" class="back-game-btn" type="button">BACK</button>
+      </header>
+      <main id="chatList" class="chat-list"></main>
+      <section id="toolPanel" class="tool-panel">
+        <div class="panel-tabs"><button id="emojiTab" class="panel-tab active" type="button">Emoji</button><button id="stickerTab" class="panel-tab" type="button">表情包</button></div>
+        <div id="emojiPage" class="panel-page active"><div id="emojiGrid" class="emoji-grid"></div></div>
+        <div id="stickerPage" class="panel-page"><div id="stickerGrid" class="sticker-grid"><label class="upload-sticker"><b>＋</b><span>本地图片</span><input id="stickerUpload" type="file" accept="image/*" /></label></div></div>
+      </section>
+      <section class="composer" id="composer"><button id="emojiBtn" class="small-tool" type="button">☺</button><button id="stickerBtn" class="small-tool" type="button">▣</button><input id="msgInput" type="text" placeholder="TYPE MESSAGE" autocomplete="off" /><button id="sendBtn" class="send-btn" type="button">GO</button></section>
+      <button id="quickGameBtn" class="quick-game-fab" type="button">PLAY</button>
+      <footer class="hold-zone" id="holdZone"><button id="holdBtn" class="hold-btn" type="button"></button><div class="hint">松开即隐藏</div></footer>
+    </section>
+  </div>
+  <script>
+    (function () {
+      var app = document.getElementById('app');
+      var gameBoard = document.getElementById('gameBoard');
+      var gameScoreEl = document.getElementById('gameScore');
+      var gameLevelEl = document.getElementById('gameLevel');
+      var gameComboEl = document.getElementById('gameCombo');
+      var gameComboBadge = document.getElementById('gameComboBadge');
+      var gameTimeEl = document.getElementById('gameTime');
+      var gamePauseBtn = document.getElementById('gamePauseBtn');
+      var gameResetBtn = document.getElementById('gameResetBtn');
+      var openChatBtn = document.getElementById('openChatBtn');
+      var backGameBtn = document.getElementById('backGameBtn');
+      var quickGameBtn = document.getElementById('quickGameBtn');
+      var gameChatInput = document.getElementById('gameChatInput');
+      var gameChatSend = document.getElementById('gameChatSend');
+      var danmakuLayer = document.getElementById('danmakuLayer');
+      var chatList = document.getElementById('chatList');
+      var msgInput = document.getElementById('msgInput');
+      var sendBtn = document.getElementById('sendBtn');
+      var holdBtn = document.getElementById('holdBtn');
+      var emojiBtn = document.getElementById('emojiBtn');
+      var stickerBtn = document.getElementById('stickerBtn');
+      var emojiTab = document.getElementById('emojiTab');
+      var stickerTab = document.getElementById('stickerTab');
+      var emojiPage = document.getElementById('emojiPage');
+      var stickerPage = document.getElementById('stickerPage');
+      var emojiGrid = document.getElementById('emojiGrid');
+      var stickerGrid = document.getElementById('stickerGrid');
+      var stickerUpload = document.getElementById('stickerUpload');
+      var toolPanel = document.getElementById('toolPanel');
+      var composer = document.getElementById('composer');
+      var stableViewportHeight = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, 667);
+      var scrollLockTimer = 0;
+      var emojis = ['😀','😄','😂','🤣','😊','😍','😘','😎','🥳','😏','😒','🥺','😭','😡','🤯','😱','🤔','🤭','😴','🤤','👍','👎','👏','🙏','💪','🫶','❤️','💔','🔥','✨','🎉','🎊'];
+      var stickers = [makeSticker('#ffe066','#ff922b','哈'), makeSticker('#b2f2bb','#37b24d','OK'), makeSticker('#a5d8ff','#1c7ed6','冷'), makeSticker('#ffc9c9','#f03e3e','怒'), makeSticker('#eebefa','#9c36b5','溜'), makeSticker('#ffd8a8','#e8590c','笑'), makeSticker('#d0bfff','#6741d9','困'), makeSticker('#c3fae8','#0ca678','赞')];
+      var messages = loadMessages();
+      var score = 0, level = 1, combo = 0, timeLeft = 45, paused = false, gameClock = 0, spawnClock = 0;
+
+      function makeSticker(bg, fg, word) {
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="36" fill="' + bg + '"/><circle cx="54" cy="62" r="10" fill="#222"/><circle cx="106" cy="62" r="10" fill="#222"/><path d="M52 100 Q80 124 108 100" fill="none" stroke="#222" stroke-width="10" stroke-linecap="round"/><text x="80" y="148" text-anchor="middle" font-size="30" font-weight="800" fill="' + fg + '" font-family="Arial">' + word + '</text></svg>';
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      }
+      function loadMessages() {
+        try { var saved = localStorage.getItem('comic_chat_final_messages_v2'); if (saved) return JSON.parse(saved); } catch (e) {}
+        return [{ role: 'other', type: 'text', text: '今晚八点后再联系。' }, { role: 'me', type: 'text', text: '收到，游戏里可以发弹幕。😂' }, { role: 'other', type: 'sticker', src: stickers[0] }, { role: 'other', type: 'text', text: '完整会话页里按住 HOLD 才显示内容。' }];
+      }
+      function saveMessages() { try { localStorage.setItem('comic_chat_final_messages_v2', JSON.stringify(messages)); } catch (e) {} }
+      function trimText(v) { return String(v || '').trim(); }
+      function lockPageScroll() { if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; }
+      function getViewportInfo() {
+        var layoutH = window.innerHeight || document.documentElement.clientHeight || stableViewportHeight;
+        if (window.visualViewport) { var visibleBottom = Math.round(window.visualViewport.height + window.visualViewport.offsetTop); var keyboardHeight = Math.max(0, layoutH - visibleBottom); return { layoutH: layoutH, visibleBottom: visibleBottom, keyboardHeight: keyboardHeight }; }
+        return { layoutH: layoutH, visibleBottom: layoutH, keyboardHeight: 0 };
+      }
+      function measureStableViewport() {
+        var h = window.innerHeight || document.documentElement.clientHeight || stableViewportHeight;
+        if (window.visualViewport && window.visualViewport.height) h = Math.max(h, Math.round(window.visualViewport.height + window.visualViewport.offsetTop));
+        stableViewportHeight = Math.max(stableViewportHeight, h);
+        document.documentElement.style.setProperty('--app-h', stableViewportHeight + 'px');
+        lockPageScroll();
+      }
+      function fixBottomGap() {
+        if (document.body.classList.contains('keyboard-open')) return;
+        var winH = window.innerHeight || document.documentElement.clientHeight || stableViewportHeight;
+        var rect = app.getBoundingClientRect();
+        var gap = Math.ceil(winH - rect.bottom);
+        if (gap > 1) { stableViewportHeight = Math.ceil(stableViewportHeight + gap + 2); document.documentElement.style.setProperty('--app-h', stableViewportHeight + 'px'); }
+      }
+      function bootViewportFix() {
+        measureStableViewport(); fixBottomGap();
+        [60,180,420,800,1300,2000].forEach(function(t){ setTimeout(function(){ measureStableViewport(); fixBottomGap(); }, t); });
+      }
+      function updateKeyboard() {
+        var info = getViewportInfo();
+        var active = document.activeElement === msgInput || document.activeElement === gameChatInput;
+        var keyboardOpen = active && info.keyboardHeight > 80;
+        if (!keyboardOpen) stableViewportHeight = Math.max(stableViewportHeight, info.visibleBottom, info.layoutH);
+        document.documentElement.style.setProperty('--app-h', stableViewportHeight + 'px');
+        if (!keyboardOpen) { setTimeout(fixBottomGap, 0); setTimeout(fixBottomGap, 80); }
+        document.documentElement.style.setProperty('--kb-offset', '0px');
+        document.body.classList.toggle('keyboard-open', keyboardOpen || active);
+        if (keyboardOpen || active) { lockPageScroll(); clearInterval(scrollLockTimer); scrollLockTimer = setInterval(lockPageScroll, 50); setTimeout(function () { clearInterval(scrollLockTimer); }, 700); }
+      }
+      function focusWithoutJump(input) { try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); } lockPageScroll(); [0,60,180,320].forEach(function(t){ setTimeout(lockPageScroll, t); }); }
+      function isEmojiOnly(text) { var t = trimText(text); if (!t || t.length > 12) return false; for (var i = 0; i < t.length; i++) { var c = t.charCodeAt(i); if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 19968 && c <= 40959)) return false; } return true; }
+      function renderMessages() { chatList.innerHTML = ''; messages.forEach(function(item){ var row = document.createElement('div'); row.className = 'msg-row ' + (item.role === 'me' ? 'me' : 'other'); var bubble = document.createElement('div'); bubble.className = 'bubble'; if (item.type === 'sticker') { bubble.className += ' sticker-bubble'; var img = document.createElement('img'); img.className = 'bubble-media'; img.src = item.src; bubble.appendChild(img); } else { var text = document.createElement('div'); text.className = 'bubble-text' + (isEmojiOnly(item.text) ? ' emoji-only' : ''); text.textContent = item.text; bubble.appendChild(text); } row.appendChild(bubble); chatList.appendChild(row); }); chatList.scrollTop = chatList.scrollHeight; }
+      function renderPanels() { emojiGrid.innerHTML = ''; emojis.forEach(function(e){ var eb = document.createElement('button'); eb.className = 'emoji-item'; eb.type = 'button'; eb.textContent = e; eb.setAttribute('data-emoji', e); emojiGrid.appendChild(eb); }); var uploadNode = stickerGrid.querySelector('.upload-sticker'); stickerGrid.innerHTML = ''; stickers.forEach(function(s){ var sb = document.createElement('button'); sb.className = 'sticker-item'; sb.type = 'button'; sb.setAttribute('data-src', s); var si = document.createElement('img'); si.src = s; sb.appendChild(si); stickerGrid.appendChild(sb); }); stickerGrid.appendChild(uploadNode); }
+      function enterChat() { document.body.classList.add('chat-mode'); closePanel(); renderMessages(); }
+      function enterGame() { document.body.classList.remove('chat-mode'); document.body.classList.remove('revealed'); closePanel(); msgInput.blur(); updateKeyboard(); }
+      function reveal() { document.body.classList.add('revealed'); holdBtn.classList.add('is-down'); }
+      function hideReveal() { document.body.classList.remove('revealed'); holdBtn.classList.remove('is-down'); }
+      function setPanel(type) { document.body.classList.add('panel-open'); emojiBtn.classList.toggle('active', type === 'emoji'); stickerBtn.classList.toggle('active', type === 'sticker'); emojiTab.classList.toggle('active', type === 'emoji'); stickerTab.classList.toggle('active', type === 'sticker'); emojiPage.classList.toggle('active', type === 'emoji'); stickerPage.classList.toggle('active', type === 'sticker'); }
+      function closePanel() { document.body.classList.remove('panel-open'); emojiBtn.classList.remove('active'); stickerBtn.classList.remove('active'); }
+      function togglePanel(type) { var same = document.body.classList.contains('panel-open') && ((type === 'emoji' && emojiPage.classList.contains('active')) || (type === 'sticker' && stickerPage.classList.contains('active'))); if (same) closePanel(); else setPanel(type); }
+      function insertAtCursor(input, text) { var start = input.selectionStart || input.value.length; var end = input.selectionEnd || input.value.length; input.value = input.value.slice(0, start) + text + input.value.slice(end); try { input.setSelectionRange(start + text.length, start + text.length); } catch (e) {} input.focus(); }
+      function sendChatText() { var text = trimText(msgInput.value); if (!text) return; messages.push({ role: 'me', type: 'text', text: text }); msgInput.value = ''; saveMessages(); renderMessages(); closePanel(); setTimeout(function () { messages.push({ role: 'other', type: 'text', text: '收到：' + text }); saveMessages(); renderMessages(); }, 500); }
+      function sendSticker(src) { messages.push({ role: 'me', type: 'sticker', src: src }); saveMessages(); renderMessages(); closePanel(); setTimeout(function () { messages.push({ role: 'other', type: 'sticker', src: stickers[Math.floor(Math.random() * stickers.length)] }); saveMessages(); renderMessages(); }, 500); }
+      function sendGameText() { var text = trimText(gameChatInput.value); if (!text) return; messages.push({ role: 'me', type: 'text', text: text }); gameChatInput.value = ''; saveMessages(); fireDanmaku(text, 'me'); setTimeout(function () { var reply = '收到：' + text; messages.push({ role: 'other', type: 'text', text: reply }); saveMessages(); fireDanmaku(reply, 'other'); }, 500); }
+      function fireDanmaku(text, role) { var item = document.createElement('div'); item.className = 'danmaku-item ' + (role === 'me' ? 'me' : 'other'); item.textContent = text.length > 28 ? text.slice(0, 28) + '…' : text; item.style.setProperty('--track', 12 + Math.floor(Math.random() * 58) + '%'); item.style.setProperty('--speed', 6 + Math.random() * 2.5 + 's'); danmakuLayer.appendChild(item); setTimeout(function () { if (item.parentNode) item.parentNode.removeChild(item); }, 9000); }
+      function resetGame() { score = 0; level = 1; combo = 0; timeLeft = 45; paused = false; gameScoreEl.textContent = score; gameLevelEl.textContent = level; gameComboEl.textContent = combo; gameComboBadge.textContent = combo; gameTimeEl.textContent = timeLeft; gamePauseBtn.textContent = '暂停'; clearTargets(); restartClock(); restartSpawner(); spawnTarget(); spawnTarget(); }
+      function restartClock() { clearInterval(gameClock); gameClock = setInterval(function () { if (paused || document.body.classList.contains('chat-mode')) return; timeLeft--; if (timeLeft <= 0) resetGame(); gameTimeEl.textContent = timeLeft; }, 1000); }
+      function restartSpawner() { clearInterval(spawnClock); spawnClock = setInterval(function () { if (paused || document.body.classList.contains('chat-mode')) return; if (gameBoard.querySelectorAll('.target').length < Math.min(7, 3 + level)) spawnTarget(); }, Math.max(420, 900 - level * 50)); }
+      function clearTargets() { var nodes = gameBoard.querySelectorAll('.target,.comic-fx,.score-pop'); for (var i = 0; i < nodes.length; i++) nodes[i].remove(); }
+      function spawnTarget() { var rect = gameBoard.getBoundingClientRect(); var size = Math.round(48 + Math.random() * 34); var x = Math.round(16 + Math.random() * Math.max(20, rect.width - size - 32)); var y = Math.round(58 + Math.random() * Math.max(40, rect.height - size - 76)); var r = Math.random(); var type = r > .90 ? 'bad' : (r > .72 ? 'bonus' : 'normal'); var target = document.createElement('button'); target.type = 'button'; target.className = 'target' + (type === 'bad' ? ' bad' : '') + (type === 'bonus' ? ' bonus' : ''); target.style.setProperty('--s', size + 'px'); target.style.setProperty('--x', x + 'px'); target.style.setProperty('--y', y + 'px'); target.setAttribute('data-type', type); gameBoard.appendChild(target); setTimeout(function () { if (target.parentNode && !paused) { target.remove(); breakCombo(); } }, Math.max(780, 1650 - level * 80)); }
+      function hitTarget(target) { if (!target || !target.classList || !target.classList.contains('target')) return; if (paused || target.getAttribute('data-hit') === '1') return; target.setAttribute('data-hit', '1'); var type = target.getAttribute('data-type'); var br = gameBoard.getBoundingClientRect(); var tr = target.getBoundingClientRect(); var x = tr.left - br.left + tr.width / 2; var y = tr.top - br.top + tr.height / 2; target.classList.add('hit'); setTimeout(function () { if (target.parentNode) target.remove(); }, 150); if (type === 'bad') { score = Math.max(0, score - 80); breakCombo(); showFx('OUCH!', x, y, true); showScore('-80', x, y); } else { combo++; var add = (type === 'bonus' ? 85 : 38) + Math.min(160, combo * 8); score += add; if (combo > 0 && combo % 8 === 0) { level++; gameLevelEl.textContent = level; restartSpawner(); } gameComboEl.textContent = combo; gameComboBadge.textContent = combo; showFx(type === 'bonus' ? 'BOOM!' : randomWord(), x, y, type === 'bonus'); showScore('+' + add, x, y); setTimeout(spawnTarget, 80); } gameScoreEl.textContent = score; }
+      function breakCombo() { combo = 0; gameComboEl.textContent = combo; gameComboBadge.textContent = combo; }
+      function randomWord() { var words = ['POW!', 'BAM!', 'HIT!', 'NICE!', 'WOW!']; return words[Math.floor(Math.random() * words.length)]; }
+      function showFx(text, x, y, hot) { var fx = document.createElement('div'); fx.className = 'comic-fx' + (hot ? ' hot' : ''); fx.textContent = text; fx.style.setProperty('--x', x + 'px'); fx.style.setProperty('--y', y + 'px'); fx.style.setProperty('--r', (Math.random() > .5 ? 1 : -1) * (6 + Math.round(Math.random() * 12)) + 'deg'); gameBoard.appendChild(fx); setTimeout(function () { if (fx.parentNode) fx.remove(); }, 700); }
+      function showScore(text, x, y) { var pop = document.createElement('div'); pop.className = 'score-pop'; pop.textContent = text; pop.style.setProperty('--x', x + 'px'); pop.style.setProperty('--y', y + 'px'); gameBoard.appendChild(pop); setTimeout(function () { if (pop.parentNode) pop.remove(); }, 650); }
+      function isInside(node, parent) { while (node) { if (node === parent) return true; node = node.parentNode; } return false; }
+      gameBoard.addEventListener('pointerdown', function (e) { hitTarget(e.target); });
+      gamePauseBtn.addEventListener('click', function () { paused = !paused; gamePauseBtn.textContent = paused ? '继续' : '暂停'; });
+      gameResetBtn.addEventListener('click', resetGame);
+      openChatBtn.addEventListener('click', enterChat);
+      backGameBtn.addEventListener('click', enterGame);
+      quickGameBtn.addEventListener('click', enterGame);
+      gameChatSend.addEventListener('click', sendGameText);
+      gameChatInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendGameText(); });
+      sendBtn.addEventListener('click', sendChatText);
+      msgInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendChatText(); });
+      holdBtn.addEventListener('touchstart', function (e) { e.preventDefault(); reveal(); }, { passive: false });
+      holdBtn.addEventListener('touchend', function (e) { e.preventDefault(); hideReveal(); }, { passive: false });
+      holdBtn.addEventListener('touchcancel', hideReveal);
+      holdBtn.addEventListener('mousedown', reveal);
+      document.addEventListener('mouseup', hideReveal);
+      emojiBtn.addEventListener('click', function () { msgInput.blur(); togglePanel('emoji'); });
+      stickerBtn.addEventListener('click', function () { msgInput.blur(); togglePanel('sticker'); });
+      emojiTab.addEventListener('click', function () { setPanel('emoji'); });
+      stickerTab.addEventListener('click', function () { setPanel('sticker'); });
+      emojiGrid.addEventListener('click', function (e) { if (e.target.classList.contains('emoji-item')) insertAtCursor(msgInput, e.target.getAttribute('data-emoji')); });
+      stickerGrid.addEventListener('click', function (e) { var node = e.target; while (node && node !== stickerGrid && !node.classList.contains('sticker-item')) node = node.parentNode; if (node && node !== stickerGrid) sendSticker(node.getAttribute('data-src')); });
+      stickerUpload.addEventListener('change', function () { var file = this.files && this.files[0]; if (!file || file.type.indexOf('image/') !== 0) return; if (file.size > 2 * 1024 * 1024) { alert('图片太大，建议 2MB 以下。'); return; } var reader = new FileReader(); reader.onload = function (ev) { sendSticker(ev.target.result); }; reader.readAsDataURL(file); this.value = ''; });
+      app.addEventListener('pointerdown', function (e) { if (document.body.classList.contains('panel-open')) { if (!isInside(e.target, toolPanel) && !isInside(e.target, composer)) closePanel(); } });
+      msgInput.addEventListener('touchstart', function (e) { e.preventDefault(); focusWithoutJump(msgInput); updateKeyboard(); }, { passive: false });
+      gameChatInput.addEventListener('touchstart', function (e) { e.preventDefault(); focusWithoutJump(gameChatInput); updateKeyboard(); }, { passive: false });
+      msgInput.addEventListener('focus', updateKeyboard);
+      msgInput.addEventListener('blur', function () { setTimeout(updateKeyboard, 120); });
+      gameChatInput.addEventListener('focus', updateKeyboard);
+      gameChatInput.addEventListener('blur', function () { setTimeout(updateKeyboard, 120); });
+      window.addEventListener('resize', function () { bootViewportFix(); updateKeyboard(); setTimeout(fixBottomGap, 120); });
+      window.addEventListener('scroll', lockPageScroll, { passive: true });
+      if (window.visualViewport) { window.visualViewport.addEventListener('resize', function () { updateKeyboard(); setTimeout(fixBottomGap, 120); }); window.visualViewport.addEventListener('scroll', function () { updateKeyboard(); setTimeout(fixBottomGap, 120); }); }
+      renderPanels(); renderMessages(); resetGame(); bootViewportFix(); updateKeyboard();
+    })();
+  </script>
+</body>
+</html>
